@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Focus Hero Pomodoro</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #ffe6f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      color: #330033;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      margin-bottom: 1rem;
+    }
+
+    input[name="username"] {
+      font-size: 1.2rem;
+      padding: 0.5rem 1rem;
+      border-radius: 12px;
+      border: 2px solid #ff69b4;
+      text-align: center;
+      width: 250px;
+      margin-bottom: 1.5rem;
+      outline: none;
+    }
+
+    input[name="username"]:focus {
+      border-color: #ff85c1;
+    }
+
+    .timer-settings {
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .timer-settings input {
+      width: 120px;
+      padding: 0.4rem 0.6rem;
+      font-size: 1rem;
+      border-radius: 10px;
+      border: 2px solid #ff69b4;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .timer-settings input:focus {
+      border-color: #ff85c1;
+    }
+
+    .timer-settings button {
+      background-color: #ff69b4;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background-color 0.3s;
+    }
+
+    .timer-settings button:hover {
+      background-color: #ff85c1;
+    }
+
+    .circle-container {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin-bottom: 1rem;
+    }
+
+    svg {
+      transform: rotate(-90deg);
+      width: 220px;
+      height: 220px;
+    }
+
+    .circle-bg {
+      fill: none;
+      stroke: #ffe6f0;
+      stroke-width: 20;
+    }
+
+    .circle-progress {
+      fill: none;
+      stroke: #ff69b4;
+      stroke-width: 20;
+      stroke-linecap: round;
+      stroke-dasharray: 0 1000;
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    #time {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 3rem;
+      font-weight: 700;
+      user-select: none;
+      color: #330033;
+    }
+
+    .buttons {
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-size: 1.2rem;
+      padding: 0.6rem 1.5rem;
+      border-radius: 15px;
+      border: none;
+      cursor: pointer;
+      background-color: #ff69b4;
+      color: white;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #ff85c1;
+    }
+
+    .avatar-text {
+      font-size: 1.3rem;
+      font-weight: 600;
+      text-align: center;
+      max-width: 350px;
+      margin-bottom: 1rem;
+      min-height: 40px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Focus Hero Pomodoro ⏳✨</h1>
+
+  <input
+    type="text"
+    id="username"
+    name="username"
+    placeholder="Enter your name, senpai~"
+    maxlength="20"
+  />
+
+  <div class="timer-settings">
+    <input
+      type="number"
+      id="workInput"
+      min="1"
+      max="120"
+      placeholder="Study minutes (default 25)"
+    />
+    <input
+      type="number"
+      id="breakInput"
+      min="1"
+      max="60"
+      placeholder="Break minutes (default 5)"
+    />
+    <button id="setTimerBtn">Set Timer</button>
+  </div>
+
+  <div class="circle-container">
+    <svg>
+      <circle class="circle-bg" r="100" cx="110" cy="110"></circle>
+      <circle class="circle-progress" r="100" cx="110" cy="110"></circle>
+    </svg>
+    <div id="time">25:00</div>
+  </div>
+
+  <div class="buttons">
+    <button id="start">Start</button>
+    <button id="pause">Pause</button>
+    <button id="reset">Reset</button>
+  </div>
+
+  <div class="avatar-text">Ready to study, senpai~ ✨</div>
+
+  <script>
+    let timer;
+    let isRunning = false;
+    let isBreak = false;
+    let workDuration = 25 * 60;
+    let breakDuration = 5 * 60;
+    let timeLeft = workDuration;
+
+    const timeDisplay = document.getElementById('time');
+    const xpBar = document.getElementById('xpBar'); // not used here, safe to remove
+    const avatarText = document.querySelector('.avatar-text');
+
+    const sound = new Audio(
+      'https://cdn.pixabay.com/download/audio/2022/03/15/audio_84f649f881.mp3'
+    ); // Bell sound
+
+    const circle = document.querySelector('.circle-progress');
+    const radius = circle.r.baseVal.value;
+    const circumference = 2 * Math.PI * radius;
+
+    // Set initial circle strokeDasharray
+    circle.style.strokeDasharray = `${circumference} ${circumference}`;
+    circle.style.strokeDashoffset = 0;
+
+    function updateCircle() {
+      const total = isBreak ? breakDuration : workDuration;
+      const offset = circumference - (timeLeft / total) * circumference;
+      circle.style.strokeDashoffset = offset;
+    }
+
+    function updateTime() {
+      let minutes = Math.floor(timeLeft / 60);
+      let seconds = timeLeft % 60;
+      timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds
+        .toString()
+        .padStart(2, '0')}`;
+      updateCircle();
+    }
+
+    function getUserName() {
+      const nameInput = document.getElementById('username').value.trim();
+      return nameInput ? nameInput : 'senpai';
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      timer = setInterval(() => {
+        if (timeLeft > 0) {
+          timeLeft--;
+          updateTime();
+        } else {
+          clearInterval(timer);
+          isRunning = false;
+          sound.play();
+
+          if (!isBreak) {
+            avatarText.textContent = `Yatta! You did it~ 🎉 Time for a break~ 🍵, ${getUserName()}!`;
+            isBreak = true;
+            timeLeft = breakDuration;
+          } else {
+            avatarText.textContent = `Back to study, ${getUserName()}~ 💪`;
+            isBreak = false;
+            timeLeft = workDuration;
+          }
+          updateTime();
+          startTimer();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      clearInterval(timer);
+      isRunning = false;
+    }
+
+    function resetTimer() {
+      clearInterval(timer);
+      isRunning = false;
+      isBreak = false;
+      timeLeft = workDuration;
+      updateTime();
+      avatarText.textContent = `Ready to study, ${getUserName()}~ ✨`;
+      // Reset circle offset
+      circle.style.strokeDashoffset = 0;
+    }
+
+    // Custom timer inputs
+    const workInput = document.getElementById('workInput');
+    const breakInput = document.getElementById('breakInput');
+    const setTimerBtn = document.getElementById('setTimerBtn');
+
+    setTimerBtn.addEventListener('click', () => {
+      const newWork = parseInt(workInput.value);
+      const newBreak = parseInt(breakInput.value);
+
+      if (
+        Number.isInteger(newWork) &&
+        newWork >= 1 &&
+        newWork <= 120 &&
+        Number.isInteger(newBreak) &&
+        newBreak >= 1 &&
+        newBreak <= 60
+      ) {
+        workDuration = newWork * 60;
+        breakDuration = newBreak * 60;
+        resetTimer();
+        alert(
+          `Timer updated! Study: ${newWork} min, Break: ${newBreak} min. Ready to go, ${getUserName()}!`
+        );
+      } else {
+        alert(
+          'Please enter valid numbers:\nStudy: 1-120 minutes\nBreak: 1-60 minutes'
+        );
+      }
+    });
+
+    document.getElementById('start').addEventListener('click', startTimer);
+    document.getElementById('pause').addEventListener('click', pauseTimer);
+    document.getElementById('reset').addEventListener('click', resetTimer);
+
+    updateTime();
+  </script>
+</body>
+</html>
+
